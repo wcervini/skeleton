@@ -1,0 +1,55 @@
+language: php
+dist: trusty
+sudo: false
+php: 7.0
+
+before_install:
+    - openssl aes-256-cbc -K $encrypted_a88fab2c7a87_key -iv $encrypted_a88fab2c7a87_iv -in secrets.tar.enc -out secrets.tar -d
+    - tar xvf secrets.tar && rm secrets.tar && mv id_rsa ~/.ssh/ && mv hub-config ~/.config/hub
+    - wget -q https://github.com/github/hub/releases/download/v2.5.0/hub-linux-amd64-2.5.0.tgz
+    - tar xzf hub-linux-amd64-2.5.0.tgz && mv hub-linux-amd64-2.5.0/bin/hub . && chmod 755 hub
+
+script:
+    - |
+        # composer update each maintained branch
+        set -e
+        git fetch origin master:master
+        git checkout -q master
+        for VERSION in $(php -r 'echo implode(" ",json_decode(file_get_contents("https://symfony.com/maintained-versions.json"),1));')
+        do
+            if [[ $VERSION = 2.8 || $VERSION = master ]]; then continue; fi
+            git fetch -q origin $VERSION:$VERSION
+            git checkout -q $(git describe --tags --abbrev=0 $VERSION)
+            phpenv global $(php -r 'echo substr(json_decode(file_get_contents("composer.json"),1)["require"]["php"],1,3);')
+            [[ -e composer.lock ]] && composer install --no-scripts --no-plugins --no-interaction --no-progress
+            UPDATE_LOG=$(composer update --no-scripts --no-plugins --no-interaction --no-progress 2>&1)
+            git add composer.lock
+
+            TAG=$(php -r 'echo json_decode(file_get_contents("https://symfony.com/versions.json"),1)[$argv[1]];' $VERSION)
+            TAG=$((git tag -l | grep -q v$TAG) && (git tag -l --sort=v:refname v$TAG.* | tail -n1) || echo v$TAG)
+            TAG=$(echo $TAG | sed -r 's/(v'$VERSION'\.[0-9]*)(\.([0-9]*))?/echo "\1.$((\3+1))"/e')
+            COMMIT_TITLE="Update dependencies - $TAG"
+            COMMIT_MESSAGE=$(echo -e "$COMMIT_TITLE\n\n$UPDATE_LOG")
+
+            if (git commit -m "$COMMIT_MESSAGE")
+            then
+                git checkout -b composer-update-$TAG
+                git push --force git@github.com:symfony-skeleton-bot/${TRAVIS_REPO_SLUG/*\//} composer-update-$TAG
+                ./hub pull-request -b $VERSION -h symfony-skeleton-bot:composer-update-$TAG -m "$COMMIT_MESSAGE" || true
+                PR=$(./hub pr list -f '%I %H%n' | grep symfony-skeleton-bot:composer-update-$TAG | cut -f 1 -d ' ')
+                git checkout $VERSION
+                ./hub merge https://github.com/$TRAVIS_REPO_SLUG/pull/$PR
+                git tag $TAG
+                git push git@github.com:$TRAVIS_REPO_SLUG $VERSION $TAG
+                git push git@github.com:symfony-skeleton-bot/${TRAVIS_REPO_SLUG/*\/} :composer-update-$TAG
+                git branch -D composer-update-$TAG
+                echo -e "\\n\\e[1;34m$COMMIT_TITLE\\e[0m"
+                echo -e "$UPDATE_LOG\\n"
+            else
+                echo -e "\\n\\e[1;34mNothing to update - $TAG\\e[0m\\n"
+            fi
+
+            rm vendor -Rf
+        done
+
+    - git push --all --force git@github.com:symfony-skeleton-bot/${TRAVIS_REPO_SLUG/*\//}
