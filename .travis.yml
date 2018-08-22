@@ -13,6 +13,7 @@ script:
     - |
         # composer update each maintained branch
         set -e
+        set -x
         git fetch origin master:master
         git checkout -q master
         for VERSION in $(php -r 'echo implode(" ",json_decode(file_get_contents("https://symfony.com/maintained-versions.json"),1));')
@@ -21,8 +22,8 @@ script:
             git fetch -q origin $VERSION:$VERSION
             git checkout -q $(git describe --tags --abbrev=0 $VERSION)
             phpenv global $(php -r 'echo substr(json_decode(file_get_contents("composer.json"),1)["require"]["php"],1,3);')
-            [[ -e composer.lock ]] && composer install --no-scripts --no-plugins --no-interaction --no-progress
-            UPDATE_LOG=$(composer update --no-scripts --no-plugins --no-interaction --no-progress 2>&1)
+            [[ -e composer.lock ]] && composer install --no-scripts --no-interaction --no-progress --no-suggest
+            UPDATE_LOG=$(composer update --no-scripts --no-interaction --no-progress --no-suggest 2>&1)
             git add composer.lock
 
             TAG=$(php -r 'echo json_decode(file_get_contents("https://symfony.com/versions.json"),1)[$argv[1]];' $VERSION)
@@ -49,7 +50,7 @@ script:
                 echo -e "\\n\\e[1;34mNothing to update - $TAG\\e[0m\\n"
             fi
 
-            rm vendor -Rf
+            rm composer.lock vendor -Rf
         done
 
     - git push --all --force git@github.com:symfony-skeleton-bot/${TRAVIS_REPO_SLUG/*\//}
