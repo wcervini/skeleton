@@ -20,13 +20,13 @@ script:
         do
             if [[ $VERSION = 2.8 || $VERSION = master ]]; then continue; fi
             git fetch -q origin $VERSION:$VERSION
-            git checkout -q $(git describe --tags --abbrev=0 $VERSION)
+            git checkout -q $VERSION
             phpenv global $(php -r 'echo substr(json_decode(file_get_contents("composer.json"),1)["require"]["php"],1,3);')
             [[ -e composer.lock ]] && composer install --no-scripts --no-interaction --no-progress --no-suggest
             UPDATE_LOG=$(composer update --no-scripts --no-interaction --no-progress --no-suggest 2>&1)
             git add composer.lock
 
-            TAG=$(git ls-remote --tags git@github.com:symfony/symfony | grep -o 'v[-_.a-zA-Z0-9]*$' | sort -V | grep -F v$VERSION | tail -n1)
+            TAG=$(git ls-remote --tags git@github.com:symfony/symfony | grep -o 'v[-_.a-zA-Z0-9]*$' | grep -F v$VERSION | xargs php -r 'usort($argv, "version_compare"); echo array_pop($argv);')
             TAG=$((git tag -l | grep -qF $TAG) && (git tag -l --sort=v:refname $TAG.* | tail -n1) || echo $TAG)
             TAG=$(echo $TAG | sed -r 's/(v'$VERSION'\.[0-9]*)(\.([0-9]*))?/echo "\1.$((\3+1))"/e')
             COMMIT_TITLE="Update dependencies - $TAG"
