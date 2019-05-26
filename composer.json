@@ -12,7 +12,22 @@
         "symfony/dotenv": "*",
         "symfony/flex": "^1.1",
         "symfony/framework-bundle": "*",
-        "symfony/yaml": "*"
+        "symfony/yaml": "*",
+        "symfony/twig-bundle":"*",
+        "symfony/asset": "*",
+        "doctrine/annotations": "*",
+        "symfony/profiler-pack": "*",
+        "symfony/form": "*",      
+        "symfony/routing": "*",
+        "symfony/orm-pack": "*",
+        "symfony/security-bundle": "*"
+    },
+    "require-dev": {
+        "symfony/debug-pack": "*",
+        "symfony/maker-bundle": "^1.0@dev",
+        "symfony/profiler-pack": "*",
+        "symfony/test-pack": "*",
+        "symfony/web-server-bundle": "*"
     },
     "config": {
         "preferred-install": {
